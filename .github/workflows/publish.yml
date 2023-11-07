@@ -101,6 +101,7 @@ jobs:
           ls -la
       - name: 查看编译的文件保存
         run: |
+          pwd
           ls -la
           mkdir -p /tmp/artifacts
           cp -r easyToTV/build/bin/easyToTV.app /tmp/artifacts/easyToTV.app
