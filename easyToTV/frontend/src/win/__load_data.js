@@ -1,6 +1,6 @@
 import {ref} from 'vue'
 import {defineStore} from 'pinia'
-import {WindowSetSize, WindowSetTitle} from "../../wailsjs/runtime/runtime"; // 根据实际文件路径进行修改
+import * as systemFc from "../../wailsjs/runtime/runtime"; // 根据实际文件路径进行修改
 import {BindWindowEvent} from '@/win/event'
 
 export const __load_data = defineStore('window_data', {
@@ -11,12 +11,12 @@ export const __load_data = defineStore('window_data', {
         return data
     },
     actions: {
-        init() {
+        async init() {
 
             BindWindowEvent(this, this.comps)
             try {
                 if (this.comps.Win.hasOwnProperty("event_created")) {
-                    this.WinCreated()
+                    await this.WinCreated()
                 }
             } catch (e) {
                 console.log("WinCreated To be defined")
@@ -31,18 +31,25 @@ export const __load_data = defineStore('window_data', {
                 if (dthis.comps.Win.height.includes('v') || dthis.comps.Win.height.includes('%')) {
                     return;
                 }
-                WindowSetSize(parseInt(dthis.comps.Win.width), parseInt(dthis.comps.Win.height))
+                systemFc.WindowSetSize(parseInt(dthis.comps.Win.width), parseInt(dthis.comps.Win.height))
                 //Recalculate the width and height of the client area
                 setTimeout(function () {
                     var WidthFix = parseInt(dthis.comps.Win.width) - window.innerWidth
                     var HeightFix = parseInt(dthis.comps.Win.height) - window.innerHeight
-                    WindowSetSize(parseInt(dthis.comps.Win.width) + WidthFix, parseInt(dthis.comps.Win.height) + HeightFix)
+                    systemFc.WindowSetSize(parseInt(dthis.comps.Win.width) + WidthFix, parseInt(dthis.comps.Win.height) + HeightFix)
                     document.body.style.overflow = 'auto'
                 }, 1)
-                WindowSetTitle(dthis.comps.Win.text)
+                systemFc.WindowSetTitle(dthis.comps.Win.text)
+                //Move to the center of the screen
+                systemFc.WindowCenter()
+                //Give the interface 200 milliseconds to load
+                setTimeout(function () {
+                    systemFc.WindowShow()
+                }, 200)
             } catch (e) {
                 console.error("Error initializing win size", e)
             }
+
         },
         handleAllEvents(el, e, item, callFuncName) {
             try {

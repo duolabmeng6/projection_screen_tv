@@ -9,6 +9,8 @@ import {ElementPlusResolver} from 'unplugin-vue-components/resolvers'
 import IconsResolver from 'unplugin-icons/resolver'
 import vueJsx from '@vitejs/plugin-vue-jsx'
 
+import { TDesignResolver } from 'unplugin-vue-components/resolvers';
+
 // https://vitejs.dev/config/
 export default defineConfig({
     server: {
@@ -32,6 +34,9 @@ export default defineConfig({
                 IconsResolver({
                     prefix: 'Icon',
                 }),
+                TDesignResolver({
+                    library: 'vue-next'
+                })
             ],
         }),
         Components({
@@ -44,6 +49,9 @@ export default defineConfig({
                 // Auto register Element Plus components
                 // 自动导入 Element Plus 组件
                 ElementPlusResolver(),
+                TDesignResolver({
+                    library: 'vue-next'
+                })
             ],
         }),
 

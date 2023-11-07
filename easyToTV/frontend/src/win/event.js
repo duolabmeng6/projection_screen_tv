@@ -13,7 +13,13 @@ export function BindWindowEvent(c, comps) {
         let 设备列表Json = await goFc.E获取设备列表();
         console.log(设备列表Json)
         // json文本转换为对象
-        let 设备列表 = JSON.parse(设备列表Json);
+        let 设备列表 = [];
+        try{
+            设备列表 = JSON.parse(设备列表Json);
+        }catch (e) {
+            ElMessage.error('你的局域网内没有发现设备,多刷新几次看看');
+            return
+        }
         console.log(设备列表)
         // [{"Model":"华为智慧屏 S65","URL":"http://192.168.100.204:25826/description.xml"},{"Model":"奇异果极速投屏-华为(204)","URL":"http://192.168.100.204:39620/description.xml"},{"Model":"MacBook Pro","URL":"http://192.168.10scription.xml"}]
         // 转换为 Model转换为label url转换为value
@@ -78,5 +84,9 @@ export function BindWindowEvent(c, comps) {
         ElMessage.success('已发送停止播放指令');
 
     }
-    //Don't delete the event function flag
+    
+    c.Button_检查更新被单击 = function () {
+        console.log("Button_检查更新被单击")
+    }
+//Don't delete the event function flag
 }

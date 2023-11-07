@@ -3,7 +3,7 @@
     "id": "1",
     "name": "Win",
     "componentName": "Window",
-    "text": "多多投屏 1.0",
+    "text": "多多投屏",
     "top": "0",
     "left": "0",
     "width": "454",
@@ -202,7 +202,7 @@
                 "componentName": "elButton",
                 "name": "Button_检查更新",
                 "data_id": "7007b1",
-                "event_click": "Button_检查更新Click"
+                "event_click": "Button_检查更新被单击"
               }
             ],
             "id": "id-88396",

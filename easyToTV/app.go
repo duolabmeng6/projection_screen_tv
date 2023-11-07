@@ -27,6 +27,8 @@ func NewApp() *App {
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	//隐藏窗口
+	//runtime.WindowShow(a.ctx)
 }
 
 // Greet returns a greeting for the given name
@@ -84,5 +86,6 @@ func (a *App) E暂停播放() string {
 }
 
 func (a *App) GetVersion() string {
+	println("GetVersion", myModel.Version)
 	return myModel.Version
 }
