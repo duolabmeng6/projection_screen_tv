@@ -149,3 +149,20 @@ func (this *E投屏模块) E停止播放() error {
 	}
 	return nil
 }
+func (this *E投屏模块) E跳转时间() error {
+
+	return nil
+}
+func (this *E投屏模块) 加音量() error {
+
+	return nil
+}
+func (this *E投屏模块) 减音量() error {
+
+	return nil
+}
+
+func (this *E投屏模块) 回调信息() error {
+
+	return nil
+}
