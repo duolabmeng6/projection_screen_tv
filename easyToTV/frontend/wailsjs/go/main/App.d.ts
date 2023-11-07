@@ -11,6 +11,8 @@ export function E获取系统时间():Promise<string>;
 
 export function E获取设备列表():Promise<string>;
 
+export function GetVersion():Promise<string>;
+
 export function Greet(arg1:string):Promise<string>;
 
 export function OpenFileDialog():Promise<string>;

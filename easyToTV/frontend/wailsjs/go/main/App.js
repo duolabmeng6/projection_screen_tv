@@ -22,6 +22,10 @@ export function E获取设备列表() {
   return window['go']['main']['App']['E获取设备列表']();
 }
 
+export function GetVersion() {
+  return window['go']['main']['App']['GetVersion']();
+}
+
 export function Greet(arg1) {
   return window['go']['main']['App']['Greet'](arg1);
 }

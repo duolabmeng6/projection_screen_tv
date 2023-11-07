@@ -3,9 +3,9 @@ import * as systemFc from "../../wailsjs/runtime";
 import * as goFc from "../../wailsjs/go/main/App";
 
 export function BindWindowEvent(c, comps) {
-    c.WinCreated = function () {
+    c.WinCreated = async function () {
         console.log("WinCreated")
-        comps.Win.text = "多多投屏 v1.0"
+        comps.Win.text = "多多投屏" + await goFc.GetVersion();
         c.刷新设备列表();
     }
     c.刷新设备列表 = async function () {

@@ -20,9 +20,9 @@ func TestE投屏模块实现_获取设备列表(t *testing.T) {
 		println(err.Error())
 	}
 	time.Sleep(10 * time.Second)
-	m.E暂停播放(设备URL)
+	m.E暂停播放()
 	time.Sleep(10 * time.Second)
-	m.E停止播放(设备URL)
+	m.E停止播放()
 
 	err = m.E投递视频文件(设备URL, "/Users/ll/Downloads/1988-龍貓CD1-国语.mp4", "")
 	if err != nil {
@@ -30,7 +30,7 @@ func TestE投屏模块实现_获取设备列表(t *testing.T) {
 	}
 	// 10秒以后停止播放
 	time.Sleep(10 * time.Second)
-	m.E停止播放(设备URL)
+	m.E停止播放()
 
 	time.Sleep(60 * time.Second)
 

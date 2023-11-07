@@ -82,3 +82,7 @@ func (a *App) E暂停播放() string {
 	}
 	return "ok"
 }
+
+func (a *App) GetVersion() string {
+	return myModel.Version
+}

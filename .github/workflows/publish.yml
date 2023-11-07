@@ -91,26 +91,26 @@ jobs:
           wails
       - name: 生成 Version.go 文件
         run: |
-          echo -e "package mymodel\n\nvar Version = \"${version}\"" > GoEasyDesigner/mymodel/Version.go
-          cat GoEasyDesigner/mymodel/Version.go
+          echo -e "package myModel\n\nvar Version = \"${version}\"" > easyToTV/myModel/Version.go
+          cat easyToTV/myModel/Version.go
       - name: 编译
         run: |
           pwd
-          cd GoEasyDesigner
+          cd easyToTV
           wails build
           ls -la
       - name: 查看编译的文件保存
         run: |
           ls -la
           mkdir -p /tmp/artifacts
-          cp -r GoEasyDesigner/build/bin/GoEasyDesigner.app /tmp/artifacts/GoEasyDesigner.app
-          cp -r GoEasyDesigner/build/dmg.sh /tmp/artifacts/dmg.sh
-          chmod +x /tmp/artifacts/GoEasyDesigner.app/Contents/MacOS/GoEasyDesigner
+          cp -r easyToTV/build/bin/easyToTV.app /tmp/artifacts/easyToTV.app
+          cp -r easyToTV/build/dmg.sh /tmp/artifacts/dmg.sh
+          chmod +x /tmp/artifacts/easyToTV.app/Contents/MacOS/easyToTV
       - name: 创建压缩包
         run: |
           cd /tmp/artifacts/
           ./dmg.sh
-          zip -r ./GoEasyDesigner_MacOS.zip ./GoEasyDesigner.app
+          zip -r ./easyToTV_MacOS.zip ./easyToTV.app
 
       - name: 上传产物
         uses: actions/upload-artifact@v3
@@ -164,11 +164,11 @@ jobs:
       - name: 生成 Version.go 文件
         shell: bash
         run: |
-          echo -e "package mymodel\n\nvar Version = \"${version}\"" > GoEasyDesigner/mymodel/Version.go
-          cat GoEasyDesigner/mymodel/Version.go
+          echo -e "package myModel\n\nvar Version = \"${version}\"" > easyToTV/myModel/Version.go
+          cat easyToTV/myModel/Version.go
       - name: 编译exe
         run: |
-          cd GoEasyDesigner
+          cd easyToTV
           wails build -webview2 embed -upx
           ls
       - name: 上传产物
@@ -176,7 +176,7 @@ jobs:
         with:
           name: window
           path: |
-            GoEasyDesigner/build/bin/*.exe
+            easyToTV/build/bin/*.exe
 
 
   jobs4:
