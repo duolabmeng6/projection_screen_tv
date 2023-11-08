@@ -3,7 +3,7 @@
   "name": "easyToTV",
   "outputfilename": "easyToTV",
   "frontend:install": "npm install",
-  "frontend:build1": "npm run build",
+  "frontend:build": "npm run build",
   "frontend:dev:watcher": "npm run dev",
   "frontend:dev:serverUrl": "auto",
   "author": {
