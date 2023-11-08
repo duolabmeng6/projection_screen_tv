@@ -1,6 +1,7 @@
 package soapcalls
 
 import (
+	"context"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -9,6 +10,10 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+)
+
+var (
+	ErrWrongDMR = errors.New("something broke somewhere - wrong DMR URL?")
 )
 
 type rootNode struct {
@@ -47,10 +52,11 @@ type DMRextracted struct {
 	AvtransportControlURL  string
 	AvtransportEventSubURL string
 	RenderingControlURL    string
+	ConnectionManagerURL   string
 }
 
 // DMRextractor extracts the services URLs from the main DMR xml.
-func DMRextractor(dmrurl string) (*DMRextracted, error) {
+func DMRextractor(ctx context.Context, dmrurl string) (*DMRextracted, error) {
 	var root rootNode
 	ex := &DMRextracted{}
 
@@ -60,7 +66,7 @@ func DMRextractor(dmrurl string) (*DMRextracted, error) {
 	}
 
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", dmrurl, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", dmrurl, nil)
 	if err != nil {
 		return nil, fmt.Errorf("DMRextractor GET error: %w", err)
 	}
@@ -106,6 +112,7 @@ func DMRextractor(dmrurl string) (*DMRextracted, error) {
 				return nil, fmt.Errorf("DMRextractor invalid AvtransportEventSubURL: %w", err)
 			}
 		}
+
 		if service.ID == "urn:upnp-org:serviceId:RenderingControl" {
 			ex.RenderingControlURL = parsedURL.Scheme + "://" + parsedURL.Host + service.ControlURL
 
@@ -114,13 +121,20 @@ func DMRextractor(dmrurl string) (*DMRextracted, error) {
 				return nil, fmt.Errorf("DMRextractor invalid RenderingControlURL: %w", err)
 			}
 		}
+
+		if service.ID == "urn:upnp-org:serviceId:ConnectionManager" {
+			ex.ConnectionManagerURL = parsedURL.Scheme + "://" + parsedURL.Host + service.ControlURL
+			if err != nil {
+				return nil, fmt.Errorf("DMRextractor invalid ConnectionManagerURL: %w", err)
+			}
+		}
 	}
 
 	if ex.AvtransportControlURL != "" {
 		return ex, nil
 	}
 
-	return nil, errors.New("something broke somewhere - wrong DMR URL?")
+	return nil, ErrWrongDMR
 }
 
 // EventNotifyParser parses the Notify messages from the DMR device.
@@ -132,6 +146,16 @@ func EventNotifyParser(xmlbody string) (string, string, error) {
 	}
 	previousstate := root.EventInstance.EventCurrentTransportActions.Value
 	newstate := root.EventInstance.EventTransportState.Value
+	////把xmlbody写到 xmlbody.log 一行一个
+	//f, err := os.OpenFile("xmlbody.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	//if err != nil {
+	//	println(err)
+	//}
+	//defer f.Close()
+	//_, err = f.WriteString(xmlbody + "\n")
+	//if err != nil {
+	//	println(err)
+	//}
 
 	return previousstate, newstate, nil
 }

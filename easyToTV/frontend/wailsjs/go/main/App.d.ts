@@ -3,13 +3,23 @@
 
 export function E停止播放():Promise<string>;
 
+export function E取消静音():Promise<string>;
+
 export function E投递视频文件(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function E暂停播放():Promise<string>;
 
+export function E继续播放():Promise<string>;
+
 export function E获取系统时间():Promise<string>;
 
 export function E获取设备列表():Promise<string>;
+
+export function E设置播放进度(arg1:number):Promise<string>;
+
+export function E静音():Promise<string>;
+
+export function E音量(arg1:string):Promise<string>;
 
 export function GetVersion():Promise<string>;
 

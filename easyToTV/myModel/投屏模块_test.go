@@ -8,9 +8,23 @@ import (
 
 func TestE投屏模块实现_获取设备列表(t *testing.T) {
 	m := New投屏模块()
+	m.E回调信息(func(eventName, jsonstring string) {
+		if eventName == "playStatus" {
+			println(jsonstring)
+		}
+		if eventName == "playPosition" {
+			println(jsonstring)
+		}
+		// 播放进度 当前位置,总长度,当前时间,总时间
+		// {"Status":"STOPPED","UUID":"9c39e130-6ca7-4bc4-b199-60c5acc261d4","event":"playStatus"}
+		// Status PLAYING PAUSED_PLAYBACK STOPPED
+
+		// {"currentPosition":"3673","currentTime":"1:59:09","event":"playPosition","overallLength":"7149","totalEvent":"1:01:13"}
+
+	})
+	// 播放状态 开始,暂停,停止
 	设备列表, err := m.E获取设备列表()
-	//println(设备列表)
-	println(err)
+
 	////设备列表转换为json
 	json, err := json.Marshal(设备列表)
 	println(string(json))
@@ -19,7 +33,19 @@ func TestE投屏模块实现_获取设备列表(t *testing.T) {
 	if err != nil {
 		println(err.Error())
 	}
-	time.Sleep(10 * time.Second)
+
+	//go func() {
+	//	for {
+	//		time.Sleep(1 * time.Second)
+	//		m.E取当前播放位置()
+	//	}
+	//}()
+	//time.Sleep(10 * time.Second)
+
+	//m.E设置播放进度(1000)
+
+	time.Sleep(300 * time.Second)
+
 	m.E暂停播放()
 	time.Sleep(10 * time.Second)
 	m.E停止播放()

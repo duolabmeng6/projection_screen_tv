@@ -4,11 +4,13 @@
 package gui
 
 import (
+	"container/ring"
+	"context"
 	"os"
 	"strings"
 	"sync"
 
-	"fyne.io/fyne/v2"
+	fyne "fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
@@ -21,29 +23,37 @@ import (
 
 // NewScreen .
 type NewScreen struct {
-	mu                  sync.RWMutex
-	Current             fyne.Window
-	tvdata              *soapcalls.TVPayload
-	Stop                *widget.Button
-	MuteUnmute          *widget.Button
-	CheckVersion        *widget.Button
-	CustomSubsCheck     *widget.Check
-	ExternalMediaURL    *widget.Check
-	MediaText           *widget.Entry
-	SubsText            *widget.Entry
-	DeviceList          *widget.List
-	httpserver          *httphandlers.HTTPserver
-	PlayPause           *widget.Button
-	mediafile           fyne.URI
-	subsfile            fyne.URI
-	selectedDevice      devType
-	State               string
-	controlURL          string
-	eventlURL           string
-	renderingControlURL string
-	version             string
-	mediaFormats        []string
-	Medialoop           bool
+	mu                   sync.RWMutex
+	Debug                *debugWriter
+	Current              fyne.Window
+	tvdata               *soapcalls.TVPayload
+	Stop                 *widget.Button
+	MuteUnmute           *widget.Button
+	CheckVersion         *widget.Button
+	CustomSubsCheck      *widget.Check
+	ExternalMediaURL     *widget.Check
+	cancelEnablePlay     context.CancelFunc
+	MediaText            *widget.Entry
+	SubsText             *widget.Entry
+	DeviceList           *widget.List
+	httpserver           *httphandlers.HTTPserver
+	PlayPause            *widget.Button
+	mediafile            fyne.URI
+	subsfile             fyne.URI
+	selectedDevice       devType
+	NextMediaCheck       *widget.Check
+	State                string
+	controlURL           string
+	eventlURL            string
+	renderingControlURL  string
+	connectionManagerURL string
+	version              string
+	mediaFormats         []string
+	Medialoop            bool
+}
+
+type debugWriter struct {
+	ring *ring.Ring
 }
 
 type devType struct {
@@ -52,11 +62,18 @@ type devType struct {
 }
 
 type mainButtonsLayout struct {
-	buttonHeight float32
+	buttonHeight  float32
+	buttonPadding float32
+}
+
+func (f *debugWriter) Write(b []byte) (int, error) {
+	f.ring.Value = string(b)
+	f.ring = f.ring.Next()
+	return len(b), nil
 }
 
 // Start .
-func Start(s *NewScreen) {
+func Start(ctx context.Context, s *NewScreen) {
 	w := s.Current
 
 	tabs := container.NewAppTabs(
@@ -66,8 +83,13 @@ func Start(s *NewScreen) {
 
 	w.SetContent(tabs)
 	w.CenterOnScreen()
+
+	go func() {
+		<-ctx.Done()
+		os.Exit(0)
+	}()
+
 	w.ShowAndRun()
-	os.Exit(0)
 }
 
 // EmitMsg Method to implement the screen interface
@@ -107,7 +129,7 @@ func InitFyneNewScreen(v string) *NewScreen {
 
 	return &NewScreen{
 		Current:      w,
-		mediaFormats: []string{".mp4", ".avi", ".mkv", ".mpeg", ".mov", ".webm", ".m4v", ".mpv", ".mp3", ".flac", ".wav"},
+		mediaFormats: []string{".mp4", ".avi", ".mkv", ".mpeg", ".mov", ".webm", ".m4v", ".mpv", ".dv", ".mp3", ".flac", ".wav", ".m4a", ".jpg", ".jpeg", ".png"},
 		version:      v,
 	}
 }
@@ -136,6 +158,10 @@ func (p *NewScreen) getScreenState() string {
 }
 
 func setPlayPauseView(s string, screen *NewScreen) {
+	if screen.cancelEnablePlay != nil {
+		screen.cancelEnablePlay()
+	}
+
 	screen.PlayPause.Enable()
 	switch s {
 	case "Play":

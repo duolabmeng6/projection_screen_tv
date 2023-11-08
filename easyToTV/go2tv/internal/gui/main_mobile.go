@@ -4,6 +4,7 @@
 package gui
 
 import (
+	"context"
 	"errors"
 	"net/url"
 	"sort"
@@ -17,7 +18,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"github.com/alexballas/go2tv/devices"
 	"github.com/alexballas/go2tv/soapcalls"
-	"github.com/alexballas/go2tv/utils"
+	"github.com/alexballas/go2tv/soapcalls/utils"
 )
 
 func mainWindow(s *NewScreen) fyne.CanvasObject {
@@ -25,7 +26,7 @@ func mainWindow(s *NewScreen) fyne.CanvasObject {
 
 	list := new(widget.List)
 
-	data := make([]devType, 0)
+	var data []devType
 
 	w.Canvas().SetOnTypedKey(func(k *fyne.KeyEvent) {
 		if k.Name == "Space" || k.Name == "P" {
@@ -123,7 +124,12 @@ func mainWindow(s *NewScreen) fyne.CanvasObject {
 	s.SubsText = sfiletext
 	s.DeviceList = list
 
-	actionbuttons := container.New(&mainButtonsLayout{buttonHeight: 1.5}, playpause, volumedown, muteunmute, volumeup, stop)
+	actionbuttons := container.New(&mainButtonsLayout{buttonHeight: 1.5, buttonPadding: theme.Padding()},
+		playpause,
+		volumedown,
+		muteunmute,
+		volumeup,
+		stop)
 
 	checklists := container.NewHBox(externalmedia, medialoop)
 	mediasubsbuttons := container.New(layout.NewGridLayout(2), mfile, sfile)
@@ -136,16 +142,22 @@ func mainWindow(s *NewScreen) fyne.CanvasObject {
 	// Widgets actions
 	list.OnSelected = func(id widget.ListItemID) {
 		playpause.Enable()
-		t, err := soapcalls.DMRextractor(data[id].addr)
+		t, err := soapcalls.DMRextractor(context.Background(), data[id].addr)
 		check(w, err)
 		if err == nil {
 			s.selectedDevice = data[id]
-			s.controlURL, s.eventlURL, s.renderingControlURL = t.AvtransportControlURL, t.AvtransportEventSubURL, t.RenderingControlURL
+			s.controlURL = t.AvtransportControlURL
+			s.eventlURL = t.AvtransportEventSubURL
+			s.renderingControlURL = t.RenderingControlURL
+			s.connectionManagerURL = t.ConnectionManagerURL
 			if s.tvdata != nil {
 				s.tvdata.RenderingControlURL = s.renderingControlURL
 			}
 		}
 	}
+
+	var mediafileOld fyne.URI
+	var mediafileOldText string
 
 	externalmedia.OnChanged = func(b bool) {
 		if b {
@@ -154,6 +166,10 @@ func mainWindow(s *NewScreen) fyne.CanvasObject {
 			// rename the label
 			mediafilelabel.Text = "URL:"
 			mediafilelabel.Refresh()
+
+			// keep old values
+			mediafileOld = s.mediafile
+			mediafileOldText = s.MediaText.Text
 
 			// Clear the Media Text Area
 			clearmediaAction(s)
@@ -169,7 +185,8 @@ func mainWindow(s *NewScreen) fyne.CanvasObject {
 		mfile.Enable()
 		mediafilelabel.Text = "File:"
 		mfiletext.SetPlaceHolder("")
-		mfiletext.Text = ""
+		s.MediaText.Text = mediafileOldText
+		s.mediafile = mediafileOld
 		mediafilelabel.Refresh()
 		mfiletext.Disable()
 	}
@@ -199,7 +216,6 @@ func refreshDevList(s *NewScreen, data *[]devType) {
 
 	for range refreshDevices.C {
 		datanew, _ := getDevices(2)
-		oldListSize := len(*data)
 
 		// check to see if the new refresh includes
 		// one of the already selected devices
@@ -227,14 +243,16 @@ func refreshDevList(s *NewScreen, data *[]devType) {
 			}
 		}
 
-		if oldListSize != len(*data) {
-			// Something changed in the list, so we need to
-			// also refresh the active selection.
-			for n, a := range *data {
-				if s.selectedDevice == a {
-					s.DeviceList.Select(n)
-				}
+		var found bool
+		for n, a := range *data {
+			if s.selectedDevice.addr == a.addr {
+				found = true
+				s.DeviceList.Select(n)
 			}
+		}
+
+		if !found {
+			s.DeviceList.UnselectAll()
 		}
 
 		s.DeviceList.Refresh()

@@ -12,19 +12,25 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/alexballas/go2tv/soapcalls"
-	"github.com/alexballas/go2tv/utils"
+	"github.com/alexballas/go2tv/soapcalls/utils"
 )
 
 // HTTPserver - new http.Server instance.
 type HTTPserver struct {
 	http *http.Server
-	mux  *http.ServeMux
+	Mux  *http.ServeMux
 	// We only need to run one ffmpeg
 	// command at a time, per server instance
-	ffmpeg *exec.Cmd
+	ffmpeg   *exec.Cmd
+	mu       sync.Mutex
+	handlers map[string]struct {
+		payload *soapcalls.TVPayload
+		media   interface{}
+	}
 }
 
 // Screen interface is used to push message back to the user
@@ -43,73 +49,104 @@ type osFileType struct {
 	path string
 }
 
+// AddHandler dynamically adds a new handler. Currenly used by the gapless playback logic where we use
+// the same server to serve multiple media files.
+func (s *HTTPserver) AddHandler(path string, payload *soapcalls.TVPayload, media interface{}) {
+	s.mu.Lock()
+	s.handlers[path] = struct {
+		payload *soapcalls.TVPayload
+		media   interface{}
+	}{payload: payload, media: media}
+	s.mu.Unlock()
+}
+
+// RemoveHandler dynamically removes a handler.
+func (s *HTTPserver) RemoveHandler(path string) {
+	s.mu.Lock()
+	delete(s.handlers, path)
+	s.mu.Unlock()
+}
+
 // StartServer will start a HTTP server to serve the selected media files and
 // also handle the subscriptions requests from the DMR devices.
-func (s *HTTPserver) StartServer(serverStarted chan<- struct{}, media, subtitles interface{},
-	tvpayload *soapcalls.TVPayload,
-) error {
+func (s *HTTPserver) StartServer(serverStarted chan<- error, media, subtitles interface{},
+	tvpayload *soapcalls.TVPayload, screen Screen,
+) {
 	mURL, err := url.Parse(tvpayload.MediaURL)
 	if err != nil {
-		return fmt.Errorf("failed to parse MediaURL: %w", err)
+		serverStarted <- fmt.Errorf("failed to parse MediaURL: %w", err)
+		return
 	}
 
 	sURL, err := url.Parse(tvpayload.SubtitlesURL)
 	if err != nil {
-		return fmt.Errorf("failed to parse SubtitlesURL: %w", err)
+		serverStarted <- fmt.Errorf("failed to parse SubtitlesURL: %w", err)
+		return
 	}
+
+	// Dynamically add handlers to better support gapless playback where we're
+	// required to serve new files with our existing HTTP server.
+	s.AddHandler(mURL.Path, tvpayload, media)
+	s.AddHandler(sURL.Path, nil, subtitles)
 
 	callbackURL, err := url.Parse(tvpayload.CallbackURL)
 	if err != nil {
-		return fmt.Errorf("failed to parse CallbackURL: %w", err)
+		serverStarted <- fmt.Errorf("failed to parse CallbackURL: %w", err)
+		return
 	}
 
-	s.mux.HandleFunc(mURL.Path, s.serveMediaHandler(tvpayload, media))
-	s.mux.HandleFunc(sURL.Path, s.serveMediaHandler(nil, subtitles))
-	s.mux.HandleFunc(callbackURL.Path, s.callbackHandler(tvpayload))
+	s.Mux.HandleFunc("/", s.ServeMediaHandler())
+	s.Mux.HandleFunc(callbackURL.Path, s.callbackHandler(tvpayload, screen))
 
 	ln, err := net.Listen("tcp", s.http.Addr)
 	if err != nil {
-		return fmt.Errorf("server listen error: %w", err)
+		serverStarted <- fmt.Errorf("server listen error: %w", err)
+		return
 	}
 
-	serverStarted <- struct{}{}
+	serverStarted <- nil
 	_ = s.http.Serve(ln)
-
-	return nil
 }
 
-func (s *HTTPserver) serveMediaHandler(tv *soapcalls.TVPayload, media interface{}) http.HandlerFunc {
-	return func(w http.ResponseWriter, req *http.Request) {
-		var media2 interface{}
-		media2 = media
+// ServeMediaHandler is a helper method used to properly handle media and subtitle streaming.
+func (s *HTTPserver) ServeMediaHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		s.mu.Lock()
+		out, exists := s.handlers[r.URL.Path]
+		s.mu.Unlock()
 
-		switch f := media.(type) {
+		if !exists {
+			http.Error(w, "not exists", http.StatusNotFound)
+			return
+		}
+
+		switch f := out.media.(type) {
 		case string:
 			m, err := os.Open(f)
 			if err != nil {
-				http.NotFound(w, req)
+				http.NotFound(w, r)
 				return
 			}
 			defer m.Close()
 
 			info, err := m.Stat()
 			if err != nil {
-				http.NotFound(w, req)
+				http.NotFound(w, r)
 				return
 			}
 
-			media2 = osFileType{
+			out.media = osFileType{
 				time: info.ModTime(),
 				file: m,
 				path: f,
 			}
 		}
 
-		serveContent(w, req, tv, media2, s.ffmpeg)
+		serveContent(w, r, out.payload, out.media, s.ffmpeg)
 	}
 }
 
-func (s *HTTPserver) callbackHandler(tv *soapcalls.TVPayload) http.HandlerFunc {
+func (s *HTTPserver) callbackHandler(tv *soapcalls.TVPayload, screen Screen) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		reqParsed, _ := io.ReadAll(req.Body)
 		sidVal, sidExists := req.Header["Sid"]
@@ -155,14 +192,14 @@ func (s *HTTPserver) callbackHandler(tv *soapcalls.TVPayload) http.HandlerFunc {
 
 		switch newstate {
 		case "PLAYING":
-			//screen.EmitMsg("Playing")
+			screen.EmitMsg("Playing")
 			tv.SetProcessStopTrue(uuid)
 		case "PAUSED_PLAYBACK":
-			//screen.EmitMsg("Paused")
+			screen.EmitMsg("Paused")
 		case "STOPPED":
-			//screen.EmitMsg("Stopped")
+			screen.EmitMsg("Stopped")
 			_ = tv.UnsubscribeSoapCall(uuid)
-			//screen.Fini()
+			screen.Fini()
 		}
 	}
 }
@@ -181,8 +218,12 @@ func NewServer(a string) *HTTPserver {
 	mux := http.NewServeMux()
 	srv := HTTPserver{
 		http:   &http.Server{Addr: a, Handler: mux},
-		mux:    mux,
+		Mux:    mux,
 		ffmpeg: new(exec.Cmd),
+		handlers: make(map[string]struct {
+			payload *soapcalls.TVPayload
+			media   interface{}
+		}),
 	}
 
 	return &srv
@@ -242,7 +283,6 @@ func serveContentReadClose(w http.ResponseWriter, r *http.Request, mediaType str
 	if r.Header.Get("getcontentFeatures.dlna.org") == "1" {
 		contentFeatures, err := utils.BuildContentFeatures(mediaType, "00", transcode)
 		if err != nil {
-			fmt.Println(err)
 			http.NotFound(w, r)
 			return
 		}

@@ -15,6 +15,12 @@ function __aux_code(list, comps) {
     comps.Button_开始播放 = list[0].childComponents[7].childComponents[1].childComponents[0]
     comps.ContentArea6 = list[0].childComponents[7].childComponents[2]
     comps.Button_停止播放 = list[0].childComponents[7].childComponents[2].childComponents[0]
+    comps.Label_开始时间 = list[0].childComponents[8]
+    comps.Label_结束时间 = list[0].childComponents[9]
+    comps.进度条_时间轴 = list[0].childComponents[10]
+    comps.按钮_静音 = list[0].childComponents[11]
+    comps.按钮_音量加 = list[0].childComponents[12]
+    comps.按钮_音量减 = list[0].childComponents[13]
 
     return comps
 }

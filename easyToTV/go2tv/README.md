@@ -1,6 +1,6 @@
 <br/>
 <p align="center">
-<img src="https://raw.githubusercontent.com/alexballas/go2tv/main/assets/go2tv-red.svg" width="225" alt="Go2TV logo">
+<img src="assets/go2tv-logo-color.svg" width="225" alt="Go2TV logo">
 </a>
 </p>
 <br/>
@@ -24,8 +24,8 @@ Cast your media files to UPnP/DLNA Media Renderers and Smart TVs.
 ---
 GUI mode
 -----
-![](https://i.imgur.com/nrfIc81.png)
-![](https://i.imgur.com/ksCaCFl.png)
+![](https://i.imgur.com/Pw44BYD.png)
+![](https://i.imgur.com/JeUxGGd.png)
 
 CLI mode
 -----
@@ -59,7 +59,7 @@ This is a GUI only limitation.
 
 Build requirements and dependencies
 -----
-- Go v1.16+
+- Go v1.19+
 - ffmpeg (optional)
 
 **Build using Docker**
@@ -78,11 +78,14 @@ Download the app here https://github.com/alexballas/Go2TV/releases/latest. A sin
 
 Go2TV supports live video transcoding, if ffmpeg is installed. When transcoding, SEEK operations are not available. Transcoding offers the maximum compatibility with the various file formats and devices. Only works with video files.
 
-**MacOS potential issue**
+**MacOS potential issues**
 
 If you get the "cannot be opened because the developer cannot be verified" error, you can apply the following workaround.
 - Control-click the app icon, then choose Open from the shortcut menu.
 - Click Open.
+
+If you get the "go2tv is damaged and can't be opened. You should move it to the Bin." error you can apply the following workaround.
+- Launch Terminal and then issue the following command: `xattr -cr /path/to/go2tv.app`.
 
 Tested on
 -----

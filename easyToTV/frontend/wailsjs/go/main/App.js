@@ -6,6 +6,10 @@ export function E停止播放() {
   return window['go']['main']['App']['E停止播放']();
 }
 
+export function E取消静音() {
+  return window['go']['main']['App']['E取消静音']();
+}
+
 export function E投递视频文件(arg1, arg2, arg3) {
   return window['go']['main']['App']['E投递视频文件'](arg1, arg2, arg3);
 }
@@ -14,12 +18,28 @@ export function E暂停播放() {
   return window['go']['main']['App']['E暂停播放']();
 }
 
+export function E继续播放() {
+  return window['go']['main']['App']['E继续播放']();
+}
+
 export function E获取系统时间() {
   return window['go']['main']['App']['E获取系统时间']();
 }
 
 export function E获取设备列表() {
   return window['go']['main']['App']['E获取设备列表']();
+}
+
+export function E设置播放进度(arg1) {
+  return window['go']['main']['App']['E设置播放进度'](arg1);
+}
+
+export function E静音() {
+  return window['go']['main']['App']['E静音']();
+}
+
+export function E音量(arg1) {
+  return window['go']['main']['App']['E音量'](arg1);
 }
 
 export function GetVersion() {

@@ -18,19 +18,24 @@ type E文件服务器接口 interface {
 	E取路径(文件名 string) string
 	E清空()
 }
-
+type PlaybackEvent struct {
+	Status string
+	UUID   string
+}
 type E文件服务器 struct {
 	E文件服务器接口
-	文件与路径      map[string]string
-	router     *gin.Engine
-	port       string
-	serverAddr string
+	文件与路径       map[string]string
+	router      *gin.Engine
+	port        string
+	serverAddr  string
+	sendChannel chan PlaybackEvent
 }
 
-func New文件服务器(port string) *E文件服务器 {
+func New文件服务器(port string, sendchan chan PlaybackEvent) *E文件服务器 {
 	m := new(E文件服务器)
 	m.port = port
 	m.文件与路径 = make(map[string]string)
+	m.sendChannel = sendchan
 	m.初始化()
 
 	return m
@@ -61,6 +66,17 @@ func (this *E文件服务器) 初始化() {
 
 		// 对请求体进行 HTML 反转义，并解析为 UPnP 事件
 		reqParsedUnescape := html.UnescapeString(string(reqParsed))
+		////写到log.txt里面
+		//f, err := os.OpenFile("log.txt", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		//if err != nil {
+		//	println(err)
+		//}
+		//defer f.Close()
+		//_, err = f.WriteString(uuid + " " + reqParsedUnescape + "\n")
+		//if err != nil {
+		//	println(err)
+		//}
+
 		previousstate, newstate, err := soapcalls.EventNotifyParser(reqParsedUnescape)
 		if err != nil {
 			c.String(http.StatusNotFound, "Error parsing UPnP event")
@@ -71,6 +87,7 @@ func (this *E文件服务器) 初始化() {
 		if newstate == "STOPPED" {
 			//tv.SetProcessStopTrue(uuid)
 			c.String(http.StatusOK, "OK\n")
+			this.sendChannel <- PlaybackEvent{Status: "STOPPED", UUID: uuid}
 			return
 		}
 
@@ -78,13 +95,17 @@ func (this *E文件服务器) 初始化() {
 		switch newstate {
 		case "PLAYING":
 			// 执行播放时的操作
-			println("PLAYING")
+			//println("PLAYING")
+			this.sendChannel <- PlaybackEvent{Status: "PLAYING", UUID: uuid}
 		case "PAUSED_PLAYBACK":
 			// 执行暂停时的操作
-			println("PAUSED_PLAYBACK")
+			//println("PAUSED_PLAYBACK")
+			this.sendChannel <- PlaybackEvent{Status: "PAUSED_PLAYBACK", UUID: uuid}
 		case "STOPPED":
 			// 执行停止时的操作
-			println("STOPPED")
+			//println("STOPPED")
+			this.sendChannel <- PlaybackEvent{Status: "STOPPED", UUID: uuid}
+
 		}
 	})
 	this.router.GET("/file/:urlPath", func(c *gin.Context) {

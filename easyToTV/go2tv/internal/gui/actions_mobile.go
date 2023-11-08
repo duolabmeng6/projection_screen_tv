@@ -10,7 +10,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -20,7 +19,7 @@ import (
 	"github.com/alexballas/go2tv/devices"
 	"github.com/alexballas/go2tv/httphandlers"
 	"github.com/alexballas/go2tv/soapcalls"
-	"github.com/alexballas/go2tv/utils"
+	"github.com/alexballas/go2tv/soapcalls/utils"
 	"github.com/pkg/errors"
 )
 
@@ -129,6 +128,37 @@ func playAction(screen *NewScreen) {
 
 	screen.PlayPause.Disable()
 
+	if screen.cancelEnablePlay != nil {
+		screen.cancelEnablePlay()
+	}
+
+	ctx, cancelEnablePlay := context.WithTimeout(context.Background(), 5*time.Second)
+	screen.cancelEnablePlay = cancelEnablePlay
+
+	go func() {
+		<-ctx.Done()
+
+		defer func() { screen.cancelEnablePlay = nil }()
+
+		if errors.Is(ctx.Err(), context.Canceled) {
+			return
+		}
+
+		out, err := screen.tvdata.GetTransportInfo()
+		if err != nil {
+			return
+		}
+
+		switch out[0] {
+		case "PLAYING":
+			setPlayPauseView("Pause", screen)
+			screen.updateScreenState("Playing")
+		case "PAUSED":
+			setPlayPauseView("Play", screen)
+			screen.updateScreenState("Paused")
+		}
+	}()
+
 	currentState := screen.getScreenState()
 
 	if currentState == "Paused" {
@@ -154,20 +184,20 @@ func playAction(screen *NewScreen) {
 
 	if screen.mediafile == nil && screen.MediaText.Text == "" {
 		check(w, errors.New("please select a media file or enter a media URL"))
-		screen.PlayPause.Enable()
+		startAfreshPlayButton(screen)
 		return
 	}
 
 	if screen.controlURL == "" {
 		check(w, errors.New("please select a device"))
-		screen.PlayPause.Enable()
+		startAfreshPlayButton(screen)
 		return
 	}
 
 	whereToListen, err := utils.URLtoListenIPandPort(screen.controlURL)
 	check(w, err)
 	if err != nil {
-		screen.PlayPause.Enable()
+		startAfreshPlayButton(screen)
 		return
 	}
 
@@ -175,7 +205,7 @@ func playAction(screen *NewScreen) {
 
 	callbackPath, err := utils.RandomString()
 	if err != nil {
-		screen.PlayPause.Enable()
+		startAfreshPlayButton(screen)
 		return
 	}
 
@@ -183,21 +213,21 @@ func playAction(screen *NewScreen) {
 		mediaURL, err := storage.OpenFileFromURI(screen.mediafile)
 		check(screen.Current, err)
 		if err != nil {
-			screen.PlayPause.Enable()
+			startAfreshPlayButton(screen)
 			return
 		}
 
 		mediaURLinfo, err := storage.OpenFileFromURI(screen.mediafile)
 		check(screen.Current, err)
 		if err != nil {
-			screen.PlayPause.Enable()
+			startAfreshPlayButton(screen)
 			return
 		}
 
 		mediaType, err = utils.GetMimeDetailsFromStream(mediaURLinfo)
 		check(w, err)
 		if err != nil {
-			screen.PlayPause.Enable()
+			startAfreshPlayButton(screen)
 			return
 		}
 
@@ -206,7 +236,7 @@ func playAction(screen *NewScreen) {
 			readerToBytes, err := io.ReadAll(mediaURL)
 			mediaURL.Close()
 			if err != nil {
-				screen.PlayPause.Enable()
+				startAfreshPlayButton(screen)
 				return
 			}
 			mediaFile = readerToBytes
@@ -217,7 +247,7 @@ func playAction(screen *NewScreen) {
 		subsFile, err = storage.OpenFileFromURI(screen.subsfile)
 		check(screen.Current, err)
 		if err != nil {
-			screen.PlayPause.Enable()
+			startAfreshPlayButton(screen)
 			return
 		}
 	}
@@ -231,21 +261,21 @@ func playAction(screen *NewScreen) {
 		mediaURL, err := utils.StreamURL(context.Background(), screen.MediaText.Text)
 		check(screen.Current, err)
 		if err != nil {
-			screen.PlayPause.Enable()
+			startAfreshPlayButton(screen)
 			return
 		}
 
 		mediaURLinfo, err := utils.StreamURL(context.Background(), screen.MediaText.Text)
 		check(screen.Current, err)
 		if err != nil {
-			screen.PlayPause.Enable()
+			startAfreshPlayButton(screen)
 			return
 		}
 
 		mediaType, err = utils.GetMimeDetailsFromStream(mediaURLinfo)
 		check(w, err)
 		if err != nil {
-			screen.PlayPause.Enable()
+			startAfreshPlayButton(screen)
 			return
 		}
 
@@ -254,7 +284,7 @@ func playAction(screen *NewScreen) {
 			readerToBytes, err := io.ReadAll(mediaURL)
 			mediaURL.Close()
 			if err != nil {
-				screen.PlayPause.Enable()
+				startAfreshPlayButton(screen)
 				return
 			}
 			mediaFile = readerToBytes
@@ -265,6 +295,7 @@ func playAction(screen *NewScreen) {
 		ControlURL:                  screen.controlURL,
 		EventURL:                    screen.eventlURL,
 		RenderingControlURL:         screen.renderingControlURL,
+		ConnectionManagerURL:        screen.connectionManagerURL,
 		MediaURL:                    "http://" + whereToListen + "/" + utils.ConvertFilename(screen.MediaText.Text),
 		SubtitlesURL:                "http://" + whereToListen + "/" + utils.ConvertFilename(screen.SubsText.Text),
 		CallbackURL:                 "http://" + whereToListen + "/" + callbackPath,
@@ -272,23 +303,20 @@ func playAction(screen *NewScreen) {
 		CurrentTimers:               make(map[string]*time.Timer),
 		MediaRenderersStates:        make(map[string]*soapcalls.States),
 		InitialMediaRenderersStates: make(map[string]bool),
-		RWMutex:                     &sync.RWMutex{},
 	}
 
 	screen.httpserver = httphandlers.NewServer(whereToListen)
-	serverStarted := make(chan struct{})
+	serverStarted := make(chan error)
 
 	// We pass the tvdata here as we need the callback handlers to be able to react
 	// to the different media renderer states.
 	go func() {
-		err := screen.httpserver.StartServer(serverStarted, mediaFile, subsFile, screen.tvdata, screen)
-		check(w, err)
-		if err != nil {
-			return
-		}
+		screen.httpserver.StartServer(serverStarted, mediaFile, subsFile, screen.tvdata, screen)
 	}()
 	// Wait for the HTTP server to properly initialize.
-	<-serverStarted
+	err = <-serverStarted
+	check(w, err)
+
 	err = screen.tvdata.SendtoTV("Play1")
 	check(w, err)
 	if err != nil {
@@ -323,22 +351,13 @@ func clearsubsAction(screen *NewScreen) {
 }
 
 func stopAction(screen *NewScreen) {
-	w := screen.Current
-
 	screen.PlayPause.Enable()
 
 	if screen.tvdata == nil || screen.tvdata.ControlURL == "" {
 		return
 	}
 
-	err := screen.tvdata.SendtoTV("Stop")
-
-	// Hack to avoid potential http errors during media loop mode.
-	// Will keep the window clean during unattended usage.
-	if screen.Medialoop {
-		err = nil
-	}
-	check(w, err)
+	_ = screen.tvdata.SendtoTV("Stop")
 
 	screen.httpserver.StopServer()
 	screen.tvdata = nil
@@ -355,14 +374,14 @@ func getDevices(delay int) ([]devType, error) {
 	}
 	// We loop through this map twice as we need to maintain
 	// the correct order.
-	keys := make([]string, 0)
+	var keys []string
 	for k := range deviceList {
 		keys = append(keys, k)
 	}
 
 	sort.Strings(keys)
 
-	guiDeviceList := make([]devType, 0)
+	var guiDeviceList []devType
 	for _, k := range keys {
 		guiDeviceList = append(guiDeviceList, devType{k, deviceList[k]})
 	}
@@ -405,4 +424,13 @@ func volumeAction(screen *NewScreen, up bool) {
 	if err := screen.tvdata.SetVolumeSoapCall(stringVolume); err != nil {
 		check(w, errors.New("could not send volume action"))
 	}
+}
+
+func startAfreshPlayButton(screen *NewScreen) {
+	if screen.cancelEnablePlay != nil {
+		screen.cancelEnablePlay()
+	}
+
+	setPlayPauseView("Play", screen)
+	screen.updateScreenState("Stopped")
 }

@@ -29,6 +29,22 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	//隐藏窗口
 	//runtime.WindowShow(a.ctx)
+
+	a.投屏模块.E回调信息(func(eventName, jsonstring string) {
+		if eventName == "playStatus" {
+			println(jsonstring)
+			runtime.EventsEmit(ctx, "playStatus", jsonstring)
+		}
+		if eventName == "playPosition" {
+			println(jsonstring)
+			runtime.EventsEmit(ctx, "playPosition", jsonstring)
+		}
+		// 播放状态 开始,暂停,停止
+		// 播放进度 当前位置,总长度,当前时间,总时间
+		// {"Status":"STOPPED","UUID":"9c39e130-6ca7-4bc4-b199-60c5acc261d4","event":"playStatus"}
+		// {"currentPosition":"3673","currentTime":"1:59:09","event":"playPosition","overallLength":"7149","totalEvent":"1:01:13"}
+		// Status PLAYING PAUSED_PLAYBACK STOPPED
+	})
 }
 
 // Greet returns a greeting for the given name
@@ -84,8 +100,48 @@ func (a *App) E暂停播放() string {
 	}
 	return "ok"
 }
+func (a *App) E继续播放() string {
+	err := a.投屏模块.E继续播放()
+	if err != nil {
+		return err.Error()
+	}
+	return "ok"
+}
 
+func (a *App) E音量(up string) string {
+	if up == "+" {
+		err := a.投屏模块.E音量(true)
+		if err != nil {
+			return err.Error()
+		}
+	} else {
+		err := a.投屏模块.E音量(false)
+		if err != nil {
+			return err.Error()
+		}
+	}
+	return "ok"
+}
+func (a *App) E静音() string {
+	err := a.投屏模块.E静音()
+	if err != nil {
+		return err.Error()
+	}
+	return "ok"
+}
+func (a *App) E取消静音() string {
+	err := a.投屏模块.E取消静音()
+	if err != nil {
+		return err.Error()
+	}
+	return "ok"
+}
 func (a *App) GetVersion() string {
 	println("GetVersion", myModel.Version)
 	return myModel.Version
+}
+func (a *App) E设置播放进度(pos int) string {
+	a.投屏模块.E设置播放进度(pos)
+	return "ok"
+
 }

@@ -3,39 +3,45 @@ package main
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"net/url"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
-	"sync"
-	"time"
+	"syscall"
 
 	"github.com/alexballas/go2tv/devices"
 	"github.com/alexballas/go2tv/httphandlers"
 	"github.com/alexballas/go2tv/soapcalls"
-	"github.com/alexballas/go2tv/utils"
-	"github.com/pkg/errors"
+	"github.com/alexballas/go2tv/soapcalls/utils"
 )
 
 var (
 	//go:embed version.txt
-	version     string
-	errNoflag   = errors.New("没有使用标志")
-	视频音频文件的本地路径 = flag.String("v", "", "视频音频文件的本地路径。 （触发 CLI 模式）")
-	媒体文件的       = flag.String("u", "", "媒体文件的 HTTP URL。 URL 流不支持查找操作。 （触发 CLI 模式）")
-	字幕文件的本地路径   = flag.String("s", "", "字幕文件的本地路径。")
-	目标URL       = flag.String("t", "", "投射到特定的 UPnP DLNA 媒体渲染器 URL。")
-	文件转码路径      = flag.Bool("tc", false, "使用 ffmpeg 对输入视频文件进行转码。")
-	所有设备列表      = flag.Bool("l", false, "列出所有可用的 UPnPDLNA 媒体渲染器模型和 URL。")
+	version      string
+	errNoflag    = errors.New("no flag used")
+	mediaArg     = flag.String("v", "", "Local path to the video/audio file. (Triggers the CLI mode)")
+	urlArg       = flag.String("u", "", "HTTP URL to the media file. URL streaming does not support seek operations. (Triggers the CLI mode)")
+	subsArg      = flag.String("s", "", "Local path to the subtitles file.")
+	targetPtr    = flag.String("t", "", "Cast to a specific UPnP/DLNA Media Renderer URL.")
+	transcodePtr = flag.Bool("tc", false, "Use ffmpeg to transcode input video file.")
+	listPtr      = flag.Bool("l", false, "List all available UPnP/DLNA Media Renderer models and URLs.")
+	versionPtr   = flag.Bool("version", false, "Print version.")
 
-	版本号 = flag.Bool("version", false, "版本号。")
+	ErrNoCombi    = errors.New("can't combine -l with other flags")
+	ErrFailtoList = errors.New("failed to list devices")
 )
+
+type dummyScreen struct {
+	ctxCancel context.CancelFunc
+}
 
 type flagResults struct {
 	dmrURL string
@@ -43,144 +49,168 @@ type flagResults struct {
 }
 
 func main() {
+	if err := run(); err != nil {
+		if errors.Is(err, errNoflag) {
+			flag.Usage()
+			os.Exit(0)
+		}
+
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Encountered error(s): %s\n", err)
+			os.Exit(1)
+		}
+	}
+}
+
+func run() error {
 	var absMediaFile string
 	var mediaType string
-	var 媒体文件 interface{}
+	var mediaFile interface{}
 	var isSeek bool
+	var s *httphandlers.HTTPserver
+
+	exitCTX, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
 
 	flag.Parse()
 
 	flagRes, err := processflags()
-	check(err)
+	if err != nil {
+		return err
+	}
 
 	if flagRes.exit {
-		os.Exit(0)
+		return nil
 	}
 
-	if *视频音频文件的本地路径 != "" {
-		媒体文件 = *视频音频文件的本地路径
+	if *mediaArg != "" {
+		mediaFile = *mediaArg
 	}
 
-	if *视频音频文件的本地路径 == "" && *媒体文件的 != "" {
-		mediaURL, err := utils.StreamURL(context.Background(), *媒体文件的)
-		check(err)
+	if *mediaArg == "" && *urlArg != "" {
+		mediaURL, err := utils.StreamURL(context.Background(), *urlArg)
+		if err != nil {
+			return err
+		}
 
-		mediaURLinfo, err := utils.StreamURL(context.Background(), *媒体文件的)
-		check(err)
+		mediaURLinfo, err := utils.StreamURL(context.Background(), *urlArg)
+		if err != nil {
+			return err
+		}
 
 		mediaType, err = utils.GetMimeDetailsFromStream(mediaURLinfo)
-		check(err)
+		if err != nil {
+			return err
+		}
 
-		媒体文件 = mediaURL
+		mediaFile = mediaURL
 
 		if strings.Contains(mediaType, "image") {
 			readerToBytes, err := io.ReadAll(mediaURL)
 			mediaURL.Close()
-			check(err)
-			媒体文件 = readerToBytes
+			if err != nil {
+				return err
+			}
+			mediaFile = readerToBytes
 		}
 	}
 
-	switch t := 媒体文件.(type) {
+	switch t := mediaFile.(type) {
 	case string:
 		absMediaFile, err = filepath.Abs(t)
-		check(err)
-
-		mfile, err := os.Open(absMediaFile)
-		check(err)
-
-		媒体文件 = absMediaFile
-		mediaType, err = utils.GetMimeDetailsFromFile(mfile)
-
-		if !*文件转码路径 {
-			isSeek = true
+		if err != nil {
+			return err
 		}
 
-		check(err)
+		mfile, err := os.Open(absMediaFile)
+		if err != nil {
+			return err
+		}
+
+		mediaFile = absMediaFile
+		mediaType, err = utils.GetMimeDetailsFromFile(mfile)
+		if err != nil {
+			return err
+		}
+
+		if !*transcodePtr {
+			isSeek = true
+		}
 	case io.ReadCloser, []byte:
-		absMediaFile = *媒体文件的
+		absMediaFile = *urlArg
 	}
 
-	字幕文件, err := filepath.Abs(*字幕文件的本地路径)
-	check(err)
-
-	upnpServicesURLs, err := soapcalls.DMRextractor(flagRes.dmrURL)
-	check(err)
-
-	whereToListen, err := utils.URLtoListenIPandPort(flagRes.dmrURL)
-	check(err)
-
-	//scr, err := interactive.InitTcellNewScreen()
-	//check(err)
-
-	callbackPath, err := utils.RandomString()
-	check(err)
-
-	tvdata := &soapcalls.TVPayload{
-		ControlURL:                  upnpServicesURLs.AvtransportControlURL,
-		EventURL:                    upnpServicesURLs.AvtransportEventSubURL,
-		RenderingControlURL:         upnpServicesURLs.RenderingControlURL,
-		CallbackURL:                 "http://" + whereToListen + "/" + callbackPath,
-		MediaURL:                    "http://" + whereToListen + "/" + utils.ConvertFilename(absMediaFile),
-		SubtitlesURL:                "http://" + whereToListen + "/" + utils.ConvertFilename(字幕文件),
-		MediaType:                   mediaType,
-		CurrentTimers:               make(map[string]*time.Timer),
-		MediaRenderersStates:        make(map[string]*soapcalls.States),
-		InitialMediaRenderersStates: make(map[string]bool),
-		RWMutex:                     &sync.RWMutex{},
-		Transcode:                   *文件转码路径,
-		Seekable:                    isSeek,
-	}
-
-	s := httphandlers.NewServer(whereToListen)
-	服务器启动 := make(chan struct{})
-
-	//我们在这里传递 tvdata，因为我们需要回调处理程序能够对不同的媒体渲染器状态做出反应。
-	go func() {
-		err := s.StartServer(服务器启动, 媒体文件, 字幕文件, tvdata)
-		check(err)
-	}()
-	// 等待HTTP服务器正确初始化
-	<-服务器启动
-	if err := tvdata.SendtoTV("Play1"); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
-	}
-	<-服务器启动
-}
-
-func check(err error) {
-	if errors.Is(err, errNoflag) {
-		flag.Usage()
-		os.Exit(0)
-	}
-
+	absSubtitlesFile, err := filepath.Abs(*subsArg)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Encountered error(s): %s\n", err)
-		os.Exit(1)
+		return err
 	}
+
+	scr := &dummyScreen{ctxCancel: cancel}
+
+	tvdata, err := soapcalls.NewTVPayload(&soapcalls.Options{
+		DMR:       flagRes.dmrURL,
+		Media:     absMediaFile,
+		Subs:      absSubtitlesFile,
+		Mtype:     mediaType,
+		Transcode: *transcodePtr,
+		Seek:      isSeek,
+		Logging:   nil,
+	})
+	if err != nil {
+		return err
+	}
+
+	s = httphandlers.NewServer(tvdata.ListenAddress())
+	serverStarted := make(chan error)
+
+	// We pass the tvdata here as we need the callback handlers to be able to react
+	// to the different media renderer states.
+	go func() {
+		s.StartServer(serverStarted, mediaFile, absSubtitlesFile, tvdata, scr)
+	}()
+
+	// Wait for HTTP server to properly initialize
+	if err := <-serverStarted; err != nil {
+		return err
+	}
+
+	err = tvdata.SendtoTV("Play1")
+	if err != nil {
+		return err
+	}
+
+	<-exitCTX.Done()
+
+	if tvdata != nil {
+		_ = tvdata.SendtoTV("Stop")
+	}
+	if s != nil {
+		s.StopServer()
+	}
+
+	return nil
 }
 
 func listFlagFunction() error {
 	flagsEnabled := 0
-	flag.Visit(func(f *flag.Flag) {
+	flag.Visit(func(*flag.Flag) {
 		flagsEnabled++
 	})
 
 	if flagsEnabled > 1 {
-		return errors.New("cant combine -l with other flags")
+		return ErrNoCombi
 	}
 
 	deviceList, err := devices.LoadSSDPservices(1)
 	if err != nil {
-		return errors.New("failed to list devices")
+		return ErrFailtoList
 	}
 
 	fmt.Println()
 
 	// We loop through this map twice as we need to maintain
 	// the correct order.
-	keys := make([]string, 0)
+	var keys []string
 	for k := range deviceList {
 		keys = append(keys, k)
 	}
@@ -206,15 +236,18 @@ func listFlagFunction() error {
 }
 
 func processflags() (*flagResults, error) {
-	checkVerflag()
-
 	res := &flagResults{}
 
-	if *视频音频文件的本地路径 == "" && !*所有设备列表 && *媒体文件的 == "" {
+	if checkVerflag() {
+		res.exit = true
+		return res, nil
+	}
+
+	if *mediaArg == "" && !*listPtr && *urlArg == "" {
 		return nil, fmt.Errorf("checkflags error: %w", errNoflag)
 	}
 
-	if err := checkTCflag(res); err != nil {
+	if err := checkTCflag(); err != nil {
 		return nil, fmt.Errorf("checkflags error: %w", err)
 	}
 
@@ -244,8 +277,8 @@ func processflags() (*flagResults, error) {
 }
 
 func checkVflag() error {
-	if !*所有设备列表 && *媒体文件的 == "" {
-		if _, err := os.Stat(*视频音频文件的本地路径); os.IsNotExist(err) {
+	if !*listPtr && *urlArg == "" {
+		if _, err := os.Stat(*mediaArg); os.IsNotExist(err) {
 			return fmt.Errorf("checkVflags error: %w", err)
 		}
 	}
@@ -254,24 +287,24 @@ func checkVflag() error {
 }
 
 func checkSflag() error {
-	if *字幕文件的本地路径 != "" {
-		if _, err := os.Stat(*字幕文件的本地路径); os.IsNotExist(err) {
+	if *subsArg != "" {
+		if _, err := os.Stat(*subsArg); os.IsNotExist(err) {
 			return fmt.Errorf("checkSflags error: %w", err)
 		}
 		return nil
 	}
 
 	// The checkVflag should happen before checkSflag so we're safe to call
-	// *视频音频文件的本地路径 here. If *字幕文件的本地路径 is empty, try to automatically find the
+	// *mediaArg here. If *subsArg is empty, try to automatically find the
 	// srt from the media file filename.
-	*字幕文件的本地路径 = (*视频音频文件的本地路径)[0:len(*视频音频文件的本地路径)-
-		len(filepath.Ext(*视频音频文件的本地路径))] + ".srt"
+	*subsArg = (*mediaArg)[0:len(*mediaArg)-
+		len(filepath.Ext(*mediaArg))] + ".srt"
 
 	return nil
 }
 
-func checkTCflag(res *flagResults) error {
-	if *文件转码路径 {
+func checkTCflag() error {
+	if *transcodePtr {
 		_, err := exec.LookPath("ffmpeg")
 		if err != nil {
 			return fmt.Errorf("checkTCflag parse error: %w", err)
@@ -282,14 +315,14 @@ func checkTCflag(res *flagResults) error {
 }
 
 func checkTflag(res *flagResults) error {
-	if *目标URL != "" {
+	if *targetPtr != "" {
 		// Validate URL before proceeding.
-		_, err := url.ParseRequestURI(*目标URL)
+		_, err := url.ParseRequestURI(*targetPtr)
 		if err != nil {
 			return fmt.Errorf("checkTflag parse error: %w", err)
 		}
 
-		res.dmrURL = *目标URL
+		res.dmrURL = *targetPtr
 		return nil
 	}
 
@@ -307,7 +340,7 @@ func checkTflag(res *flagResults) error {
 }
 
 func checkLflag() (bool, error) {
-	if *所有设备列表 {
+	if *listPtr {
 		if err := listFlagFunction(); err != nil {
 			return false, fmt.Errorf("checkLflag error: %w", err)
 		}
@@ -317,9 +350,19 @@ func checkLflag() (bool, error) {
 	return false, nil
 }
 
-func checkVerflag() {
-	if *版本号 && os.Args[1] == "-version" {
+func checkVerflag() bool {
+	if *versionPtr && os.Args[1] == "-version" {
 		fmt.Printf("Go2TV Version: %s\n", version)
-		os.Exit(0)
+		return true
 	}
+	return false
+}
+
+func (s *dummyScreen) EmitMsg(msg string) {
+	fmt.Println(msg)
+}
+
+func (s *dummyScreen) Fini() {
+	fmt.Println("exiting..")
+	s.ctxCancel()
 }
