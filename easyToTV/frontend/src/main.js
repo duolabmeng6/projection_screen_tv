@@ -13,8 +13,8 @@ import RenderDesignComponentPreview from "./components/RenderDesignComponentPrev
 
 const app = createApp(App)
 
-app.component('RenderDesignComponent', RenderDesignComponentPreview)
 
+app.component('RenderDesignComponent', RenderDesignComponentPreview)
 
 const BoxComponentNames_el = Helper.registerBoxComponentNames(app, 'el', import.meta.glob('./components/boxs/el/**/*.vue', {eager: true}))
 const BoxComponentNames_td = Helper.registerBoxComponentNames(app, 'td', import.meta.glob('./components/boxs/td/**/*.vue', {eager: true}))
