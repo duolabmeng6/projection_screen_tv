@@ -18,6 +18,10 @@ export function E暂停播放() {
   return window['go']['main']['App']['E暂停播放']();
 }
 
+export function E检查更新() {
+  return window['go']['main']['App']['E检查更新']();
+}
+
 export function E继续播放() {
   return window['go']['main']['App']['E继续播放']();
 }

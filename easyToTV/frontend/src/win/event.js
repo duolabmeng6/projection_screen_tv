@@ -91,12 +91,6 @@ export function BindWindowEvent(c, comps) {
 
     }
 
-    c.Button_检查更新Click = function () {
-        console.log("Button_检查更新Click")
-
-        ElMessage.success('暂时没有开发');
-    }
-
     c.Button_开始播放Click = function () {
         console.log("Button_开始播放Click")
         if (comps.Select_设备列表.value == "") {
@@ -140,10 +134,10 @@ export function BindWindowEvent(c, comps) {
         comps.进度条_时间轴.n = parseInt(0);
     }
     
-    c.Button_检查更新被单击 = function () {
+    c.Button_检查更新被单击 = async function () {
         console.log("Button_检查更新被单击")
-        ElMessage.success('等待开发');
-
+        ElMessage.success('检查更新中');
+        await goFc.E检查更新();
     }
     
 

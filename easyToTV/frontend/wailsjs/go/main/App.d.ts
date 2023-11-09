@@ -9,6 +9,8 @@ export function E投递视频文件(arg1:string,arg2:string,arg3:string):Promise
 
 export function E暂停播放():Promise<string>;
 
+export function E检查更新():Promise<string>;
+
 export function E继续播放():Promise<string>;
 
 export function E获取系统时间():Promise<string>;

@@ -145,3 +145,7 @@ func (a *App) E设置播放进度(pos int) string {
 	return "ok"
 
 }
+func (a *App) E检查更新() string {
+	myModel.E检查更新()
+	return "ok"
+}
