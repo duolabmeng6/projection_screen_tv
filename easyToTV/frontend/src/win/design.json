@@ -5,9 +5,9 @@
     "componentName": "Window",
     "text": "多多投屏",
     "top": "0",
-    "left": "0",
-    "width": "454",
-    "height": "365",
+    "left": "20",
+    "width": "450",
+    "height": "360",
     "background": "rgba(0, 0, 0, 0.05)",
     "noPlace": false,
     "noDrag": true,
@@ -36,10 +36,10 @@
         "data_id": "5ebfb4"
       },
       {
-        "top": "51",
-        "left": "345",
-        "width": "76",
-        "height": "32",
+        "top": 53,
+        "left": 345,
+        "width": 80,
+        "height": 40,
         "noPlace": true,
         "buttonType": "default",
         "visible": true,
@@ -74,10 +74,10 @@
         "data_id": "274f14"
       },
       {
-        "top": "138",
-        "left": "345",
-        "width": "76",
-        "height": "32",
+        "top": 135,
+        "left": 345,
+        "width": 80,
+        "height": 40,
         "noPlace": true,
         "buttonType": "default",
         "visible": true,
@@ -122,7 +122,7 @@
         "top": "53",
         "left": "20",
         "width": "300",
-        "height": "32",
+        "height": "38",
         "noPlace": true,
         "visible": true,
         "disable": false,
@@ -134,7 +134,8 @@
         "id": "id-74711",
         "componentName": "tdSelect",
         "name": "Select_设备列表",
-        "data_id": "099609"
+        "data_id": "099609",
+        "size": "large"
       },
       {
         "top": "91",
@@ -159,8 +160,8 @@
       {
         "top": "207",
         "left": "20",
-        "width": "401",
-        "height": "33",
+        "width": "405",
+        "height": "40",
         "noPlace": true,
         "visible": true,
         "disable": false,
@@ -264,7 +265,7 @@
             "childComponents": [
               {
                 "top": 0,
-                "left": "0",
+                "left": null,
                 "width": "100%",
                 "height": "100%",
                 "noPlace": true,
@@ -292,7 +293,7 @@
       },
       {
         "top": "259",
-        "left": "-10",
+        "left": -10,
         "width": "78",
         "height": "40",
         "noPlace": true,
@@ -312,7 +313,7 @@
       },
       {
         "top": "258",
-        "left": "365",
+        "left": 365,
         "width": "90",
         "height": "40",
         "noPlace": true,
@@ -331,10 +332,10 @@
         "data_id": "dd9f27"
       },
       {
-        "top": "261",
-        "left": "75",
+        "top": "263",
+        "left": "84",
         "width": "267",
-        "height": "30",
+        "height": "40",
         "noPlace": true,
         "visible": true,
         "disable": false,
@@ -354,10 +355,10 @@
         "event_mouseup": "进度条_时间轴鼠标左键被放开"
       },
       {
-        "top": "310",
-        "left": "21",
-        "width": "76",
-        "height": "40",
+        "top": 310,
+        "left": 21,
+        "width": 80,
+        "height": 40,
         "noPlace": true,
         "buttonType": "default",
         "visible": true,
@@ -372,10 +373,10 @@
         "event_click": "按钮_静音被单击"
       },
       {
-        "top": "310",
-        "left": "109",
-        "width": "76",
-        "height": "40",
+        "top": 310,
+        "left": 109,
+        "width": 80,
+        "height": 40,
         "noPlace": true,
         "buttonType": "default",
         "visible": true,
@@ -392,7 +393,7 @@
       {
         "top": "310",
         "left": "196",
-        "width": "76",
+        "width": "80",
         "height": "40",
         "noPlace": true,
         "buttonType": "default",
