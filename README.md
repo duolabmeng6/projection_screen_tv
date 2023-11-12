@@ -5,7 +5,7 @@
 # MacOS
 ![image-20231109005542075](./assets/image-20231109005542075.png)
 # Window
-![image-20220730180009303](images/README/2022-07-31_12.40.17.png)
+![image-20220730180009303](./assets/w.jpg)
 
 # 软件下载
 
