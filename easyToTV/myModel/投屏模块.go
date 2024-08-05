@@ -9,7 +9,6 @@ import (
 	"github.com/alexballas/go2tv/soapcalls"
 	"github.com/alexballas/go2tv/soapcalls/utils"
 	"os"
-	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -208,9 +207,10 @@ func (this *E投屏模块) E设置播放进度(cur int) error {
 
 func (this *E投屏模块) E投递视频文件(设备URL string, 文件路径 string, 字幕文件路径 string) error {
 	//获取文件名
-	fileName := path.Base(文件路径)
+	fileName := filepath.Base(文件路径)
+
 	播放文件URL := this.FileServer.E写文件名与路径(fileName, 文件路径)
-	fileName = path.Base(字幕文件路径)
+	fileName = filepath.Base(字幕文件路径)
 	字幕文件URL := this.FileServer.E写文件名与路径(fileName, 字幕文件路径)
 
 	// 获取设备的 UPnP DLNA 媒体渲染器信息
