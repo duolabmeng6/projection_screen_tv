@@ -25,5 +25,3 @@
 # 赞赏
 
 如果觉得项目对你有帮助，可以请作者喝杯咖啡
-
-![swskm](https://github.com/user-attachments/assets/83557145-89aa-4c34-9cbf-a6e31701b702)
